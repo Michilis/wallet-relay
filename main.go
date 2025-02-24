@@ -27,6 +27,17 @@ var walletKinds = []int{
 	7375,
 	7376,
 	7374,
+	// NIP-87 kinds
+	38000, // Recommendation Event
+	38172, // Cashu Mint Announcement
+	38173, // Fedimint Announcement,
+	// NIP-61 kinds
+	10019, // Nutzap Informational Event
+	9321,  // Nutzap Event
+	23194, // Wallet Requests (Optional) - NIP-47
+	31990, // Data Vending Machine (Optional) - NIP-90
+	3,     // OpenTimestamps (NIP-3)
+	5,     // Event Deletion (NIP-9)
 }
 
 type Config struct {
@@ -54,10 +65,20 @@ func main() {
 		panic(err)
 	}
 
+	// Implement NIP-42: Client Authentication
+	relay.Authenticate = func(ctx context.Context, event *nostr.Event) (bool, string) {
+		// Verify the signature of the event
+		if !event.VerifySignature() {
+			return false, "invalid-signature: authentication failed"
+		}
+		// Additional authentication logic can be added here
+		return true, ""
+	}
+
 	relay.RejectFilter = append(relay.RejectFilter, func(ctx context.Context, filter nostr.Filter) (bool, string) {
 		if !containsOnlyWalletKids(filter.Kinds) {
-			fmt.Println("attempted to subscribe to non-wallet kinds", filter.Kinds)
-			return true, "invalid-filter: only wallet kinds are allowed"
+			fmt.Println(MsgSubscribeFail, filter.Kinds)
+			return true, MsgInvalidFilter
 		}
 
 		return false, ""
@@ -65,8 +86,8 @@ func main() {
 
 	relay.RejectEvent = append(relay.RejectEvent, func(ctx context.Context, event *nostr.Event) (bool, string) {
 		if !containsOnlyWalletKids([]int{event.Kind}) {
-			fmt.Println("attempted to publish non-wallet kind", event.Kind)
-			return true, "invalid-event: only wallet kinds are allowed"
+			fmt.Println(MsgPublishFail, event.Kind)
+			return true, MsgInvalidEvent
 		}
 
 		return false, ""
@@ -78,7 +99,7 @@ func main() {
 
 	addr := fmt.Sprintf("%s:%s", "0.0.0.0", config.RelayPort)
 
-	log.Printf("🔗 listening at %s", addr)
+	log.Printf(MsgListening, addr)
 	err := http.ListenAndServe(addr, relay)
 	if err != nil {
 		log.Fatal(err)
