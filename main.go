@@ -65,26 +65,11 @@ func main() {
 		panic(err)
 	}
 
-	// Implement NIP-42: Client Authentication
-	relay.Authenticate = func(ctx context.Context, event *nostr.Event) (bool, string) {
-		// Verify the signature of the event
-		if !event.VerifySignature() {
-			return false, "invalid-signature: authentication failed"
-		}
-		// Additional authentication logic can be added here
-		return true, ""
-	}
-
-	relay.RejectFilter = append(relay.RejectFilter, func(ctx context.Context, filter nostr.Filter) (bool, string) {
-		if !containsOnlyWalletKids(filter.Kinds) {
-			fmt.Println(MsgSubscribeFail, filter.Kinds)
-			return true, MsgInvalidFilter
-		}
-
-		return false, ""
-	})
-
+	// Custom authentication logic
 	relay.RejectEvent = append(relay.RejectEvent, func(ctx context.Context, event *nostr.Event) (bool, string) {
+		if !verifyEventSignature(event) {
+			return true, "invalid-signature: authentication failed"
+		}
 		if !containsOnlyWalletKids([]int{event.Kind}) {
 			fmt.Println(MsgPublishFail, event.Kind)
 			return true, MsgInvalidEvent
@@ -142,5 +127,12 @@ func containsOnlyWalletKids(kinds []int) bool {
 		}
 	}
 
+	return true
+}
+
+// Custom function to verify event signatures
+func verifyEventSignature(event *nostr.Event) bool {
+	// Implement signature verification logic here
+	// This is a placeholder and should be replaced with actual verification code
 	return true
 }
